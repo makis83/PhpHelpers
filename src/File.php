@@ -3,6 +3,7 @@
 namespace Makis83\Helpers;
 
 use InvalidArgumentException;
+use PHPUnit\Framework\Attributes\Group;
 use Safe\Exceptions\SafeExceptionInterface;
 
 /**
@@ -12,8 +13,8 @@ use Safe\Exceptions\SafeExceptionInterface;
  * Date: 2025-09-13
  * Time: 22:21
  *
- * @group filesystem
  */
+#[Group("file")]
 class File
 {
     /**

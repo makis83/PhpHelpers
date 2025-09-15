@@ -4,6 +4,7 @@ namespace Makis83\Helpers;
 use tidy;
 use HTMLPurifier;
 use RuntimeException;
+use PHPUnit\Framework\Attributes\Group;
 use Safe\Exceptions\SafeExceptionInterface;
 
 /**
@@ -13,6 +14,7 @@ use Safe\Exceptions\SafeExceptionInterface;
  * Date: 2025-09-15
  * Time: 15:20
  */
+#[Group("text")]
 class Html
 {
     /**

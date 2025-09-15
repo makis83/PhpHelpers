@@ -2,6 +2,7 @@
 
 namespace Makis83\Helpers;
 
+use PHPUnit\Framework\Attributes\Group;
 use Safe\Exceptions\SafeExceptionInterface;
 
 /**
@@ -11,6 +12,7 @@ use Safe\Exceptions\SafeExceptionInterface;
  *  Date: 2025-09-15
  *  Time: 17:48
  */
+#[Group("text")]
 class Text
 {
     /**
