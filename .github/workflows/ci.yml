@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4 # Checkout the repository code
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2' # Specify your desired PHP version
+          extensions: mbstring, tidy # Add any required PHP extensions
+          ini-values: post_max_size=256M, upload_max_filesize=256M
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --no-progress
+
+      - name: Run PHPUnit tests
+        run: ./vendor/bin/phpunit
