@@ -3,7 +3,6 @@
 namespace Makis83\Helpers;
 
 use InvalidArgumentException;
-use PHPUnit\Framework\Attributes\Group;
 use Safe\Exceptions\SafeExceptionInterface;
 
 /**
@@ -14,14 +13,13 @@ use Safe\Exceptions\SafeExceptionInterface;
  * Time: 22:21
  *
  */
-#[Group("file")]
 class File
 {
     /**
      * Normalize a file path to use forward slashes.
      *
-     * @param string $path Path to normalize
-     * @return string Normalized path
+     * @param non-empty-string $path Path to normalize
+     * @return non-empty-string Normalized path
      */
     protected static function normalizePath(string $path): string
     {
@@ -32,7 +30,7 @@ class File
     /**
      * Get file extension from a file with the given path.
      *
-     * @param string $path Path to a file
+     * @param non-empty-string $path Path to a file
      * @return string File extension
      */
     public static function fileExtension(string $path): string
@@ -65,7 +63,7 @@ class File
     /**
      * Get file name from the given path.
      *
-     * @param string $path Path to a file
+     * @param non-empty-string $path Path to a file
      * @param bool $withExtension Whether to include the file extension
      * @return string File name with or without extension
      */
@@ -80,7 +78,7 @@ class File
         }
 
         // Get file extension
-        $fileExtension = static::fileExtension($fileName);
+        $fileExtension = static::fileExtension($path);
         if ('' === $fileExtension) {
             return $fileName;
         }
@@ -93,7 +91,7 @@ class File
     /**
      * Check if the specified path is an absolute path.
      *
-     * @param string $path Path
+     * @param non-empty-string $path Path
      * @param bool $allowSchemes Whether to consider paths with schemes (like http://) as absolute
      * @return bool True if the path is an absolute path
      * @throws SafeExceptionInterface
@@ -125,7 +123,7 @@ class File
     /**
      * Create a directory with the given path if it doesn't exist.
      *
-     * @param string $path Absolute path to the directory that should be created
+     * @param non-empty-string $path Absolute path to the directory that should be created
      * @param int $mode Directory mode (permissions), default is 0775
      * @param ?string $owner Directory owner
      * @param ?string $group Directory group
@@ -205,7 +203,7 @@ class File
     /**
      * Remove directory and all its files and subdirs recursively.
      *
-     * @param string $path Absolute path to the directory to remove
+     * @param non-empty-string $path Absolute path to the directory to remove
      * @return void
      * @throws InvalidArgumentException|SafeExceptionInterface on errors
      */
@@ -252,8 +250,8 @@ class File
     /**
      * Sanitizes a filename by removing characters that are problematic for filesystems.
      *
-     * @param string $fileName Filename to sanitize
-     * @param string $replacement Character to use as replacement for invalid characters
+     * @param non-empty-string $fileName Filename to sanitize
+     * @param non-empty-string $replacement Character to use as replacement for invalid characters
      * @return string Sanitized filename
      */
     public static function sanitizeFilename(string $fileName, string $replacement = '_'): string

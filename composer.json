@@ -2,13 +2,14 @@
     "name": "makis83/helpers",
     "description": "A collection of PHP helper classes for files, texts, images etc.",
     "type": "library",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "license": "MIT",
     "require": {
         "php": "^8.2",
         "ext-mbstring": "*",
         "ext-tidy": "*",
-        "ezyang/htmlpurifier": "dev-master"
+        "ezyang/htmlpurifier": "dev-master",
+        "thecodingmachine/safe": "^3.3"
     },
     "autoload": {
         "psr-4": {

@@ -2,7 +2,6 @@
 
 namespace Makis83\Helpers;
 
-use PHPUnit\Framework\Attributes\Group;
 use Safe\Exceptions\SafeExceptionInterface;
 
 /**
@@ -12,7 +11,6 @@ use Safe\Exceptions\SafeExceptionInterface;
  *  Date: 2025-09-15
  *  Time: 17:48
  */
-#[Group("text")]
 class Text
 {
     /**
@@ -33,7 +31,7 @@ class Text
 
     /**
      * Convert class name (with or without namespace) to ID.
-     * @param string $class Class' full path
+     * @param non-empty-string $class Class' full path
      * @return string Class' ID
      */
     public static function classNameToId(string $class): string

@@ -17,9 +17,9 @@ use Safe\Exceptions\SafeExceptionInterface;
 class FileTest extends TestCase
 {
     /**
-     * @var string $testBaseDir Base directory for tests
+     * @var non-empty-string $testBaseDir Base directory for tests
      */
-    private string $testBaseDir = '';
+    private string $testBaseDir = 'temp';
 
     /**
      * @var string $testNestedDir Nested directory path for tests
@@ -51,7 +51,7 @@ class FileTest extends TestCase
                 $this->markTestSkipped('Could not create test directory');
             }
         } catch (SafeExceptionInterface $exception) {
-            $this->markTestSkipped('Could not create test directory');
+            $this->markTestSkipped('Could not create test directory: ' . $exception->getMessage());
         }
     }
 
@@ -77,7 +77,6 @@ class FileTest extends TestCase
      */
     final public function testFileExtension(): void
     {
-        $this->assertEquals('', File::fileExtension(''));
         $this->assertEquals('', File::fileExtension('binfile'));
         $this->assertEquals('', File::fileExtension('.htaccess'));
         $this->assertEquals('txt', File::fileExtension('document.txt'));
@@ -93,8 +92,6 @@ class FileTest extends TestCase
      */
     final public function testFileName(): void
     {
-        $this->assertEquals('', File::fileName(''));
-
         $this->assertEquals('binfile', File::fileName('binfile'));
         $this->assertEquals('binfile', File::fileName('binfile', false));
 
@@ -138,7 +135,7 @@ class FileTest extends TestCase
 
     /**
      * Create the test directory.
-     * @param string $dir Directory path
+     * @param non-empty-string $dir Directory path
      * @param int $mode Directory permissions
      * @return void
      */
@@ -154,7 +151,7 @@ class FileTest extends TestCase
 
     /**
      * Remove the test directory.
-     * @param string $dir Directory path
+     * @param non-empty-string $dir Directory path
      * @param bool $recursively Whether to remove directories recursively
      * @return void
      */
@@ -207,10 +204,6 @@ class FileTest extends TestCase
 
         $this->assertEquals('750', $filePerms);
         $this->removeTestDir($nestedDir);
-
-        // Test creating empty directory path
-        $this->expectException(InvalidArgumentException::class);
-        File::ensureDirectory('');
 
         // Test creating non-absolute directory path
         $this->expectException(InvalidArgumentException::class);
@@ -268,7 +261,6 @@ class FileTest extends TestCase
      */
     final public function testSanitizeFilename(): void
     {
-        $this->assertEquals('_', File::sanitizeFilename(''));
         $this->assertEquals('valid_filename.txt', File::sanitizeFilename('valid_filename.txt'));
         $this->assertEquals(
             '!!  invalid ¹²% _файлнаме__.txt',
