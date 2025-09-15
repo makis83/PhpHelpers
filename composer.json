@@ -1,0 +1,41 @@
+{
+    "name": "makis83/helpers",
+    "description": "A collection of PHP helper classes for files, texts, images etc.",
+    "type": "library",
+    "version": "1.0.0",
+    "license": "MIT",
+    "require": {
+        "php": "^8.2",
+        "ext-mbstring": "*",
+        "ext-tidy": "*",
+        "ezyang/htmlpurifier": "dev-master"
+    },
+    "autoload": {
+        "psr-4": {
+            "Makis83\\Helpers\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Max Ivanooshchik",
+            "email": "webcabmi@gmail.com"
+        }
+    ],
+    "minimum-stability": "dev",
+    "require-dev": {
+        "phpunit/phpunit": "^11.0.1",
+        "phpstan/phpstan": "^2.1.x-dev",
+        "thecodingmachine/phpstan-safe-rule": "^1.4"
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Makis83\\Helpers\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": [
+            "./vendor/bin/phpunit",
+            "./vendor/bin/phpstan analyse"
+        ]
+    }
+}
