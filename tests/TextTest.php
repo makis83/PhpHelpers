@@ -6,7 +6,7 @@ use Makis83\Helpers\Text;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Class description.
+ * Tests for Text helper.
  * Created by PhpStorm.
  * User: max
  * Date: 2025-09-15

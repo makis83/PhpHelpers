@@ -1,4 +1,5 @@
 <?php
+
 namespace Makis83\Helpers;
 
 use tidy;
@@ -60,7 +61,7 @@ class Html
         if (null === $charset) {
             try {
                 $charset = \Safe\ini_get('default_charset');
-            } catch(SafeExceptionInterface) {
+            } catch (SafeExceptionInterface) {
                 $charset = 'UTF-8';
             }
         }
@@ -91,8 +92,8 @@ class Html
      * @param boolean $repair Whether to repair the possibly broken HTML
      * @param null|string $charset Character set (default is application charset)
      * @return string HTML code
-     * @see http://api.html-tidy.org/tidy/quickref_5.0.0.html
      * @throws RuntimeException if Tidy extension is not loaded
+     * @see http://api.html-tidy.org/tidy/quickref_5.0.0.html
      */
     public static function tidy(string $html, bool $repair = true, ?string $charset = null): string
     {
@@ -105,7 +106,7 @@ class Html
         if (null === $charset) {
             try {
                 $charset = \Safe\ini_get('default_charset');
-            } catch(SafeExceptionInterface) {
+            } catch (SafeExceptionInterface) {
                 $charset = 'UTF-8';
             }
         }
@@ -203,7 +204,7 @@ class Html
         if (null === $charset) {
             try {
                 $charset = \Safe\ini_get('default_charset');
-            } catch(SafeExceptionInterface) {
+            } catch (SafeExceptionInterface) {
                 $charset = 'UTF-8';
             }
         }
@@ -219,7 +220,7 @@ class Html
         }
 
         // Process each paragraph
-        $html = array_map(static function(string $paragraph) use ($charset): string {
+        $html = array_map(static function (string $paragraph) use ($charset): string {
             // Trim whitespace
             $paragraph = trim($paragraph);
 
@@ -240,7 +241,8 @@ class Html
      * @param string $text text
      * @return string[] array of used HTML tags
      */
-    public static function textTags(string $text): array {
+    public static function textTags(string $text): array
+    {
         // Check if text is not an HTML
         if (!static::isHTML($text)) {
             return [];
@@ -253,7 +255,7 @@ class Html
 
             // Get unique tag names (case-insensitive)
             return array_keys(array_flip(array_map('strtolower', $matches[1])));
-        } catch(SafeExceptionInterface) {
+        } catch (SafeExceptionInterface) {
             return [];
         }
     }
