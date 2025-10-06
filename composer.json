@@ -2,14 +2,18 @@
     "name": "makis83/helpers",
     "description": "A collection of PHP helper classes for files, texts, images etc.",
     "type": "library",
-    "version": "1.0.1",
+    "version": "1.0.4",
     "license": "MIT",
     "require": {
         "php": "^8.2",
         "ext-mbstring": "*",
         "ext-tidy": "*",
+        "ext-posix": "*",
+        "ext-intl": "*",
+        "ext-iconv": "*",
         "thecodingmachine/safe": "^3.3",
-        "ezyang/htmlpurifier": "^4.18"
+        "ezyang/htmlpurifier": "^4.18",
+        "jeremykendall/php-domain-parser": "^6.0"
     },
     "autoload": {
         "psr-4": {
@@ -24,9 +28,11 @@
     ],
     "minimum-stability": "dev",
     "require-dev": {
+        "ext-pcov": "*",
         "phpunit/phpunit": "^11.0.1",
         "phpstan/phpstan": "^2.1.x-dev",
-        "thecodingmachine/phpstan-safe-rule": "^1.4"
+        "thecodingmachine/phpstan-safe-rule": "^1.4",
+        "friendsofphp/php-cs-fixer": "dev-master"
     },
     "autoload-dev": {
         "psr-4": {
@@ -35,8 +41,12 @@
     },
     "scripts": {
         "test": [
-            "./vendor/bin/phpunit",
+            "./vendor/bin/phpunit --coverage-html coverage/html",
             "./vendor/bin/phpstan analyse"
-        ]
+        ],
+        "update-domains": [
+            "php ./scripts/updater.php"
+        ],
+        "coverage": "./vendor/bin/phpunit --coverage-html coverage/html"
     }
 }

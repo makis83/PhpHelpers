@@ -5,6 +5,7 @@ namespace Makis83\Helpers;
 use tidy;
 use HTMLPurifier;
 use RuntimeException;
+use Makis83\Helpers\traits\Charset;
 use Safe\Exceptions\SafeExceptionInterface;
 
 /**
@@ -16,6 +17,9 @@ use Safe\Exceptions\SafeExceptionInterface;
  */
 class Html
 {
+    use Charset;
+
+
     /**
      * Detect whether the text is an HTML code.
      *
@@ -58,13 +62,7 @@ class Html
         $isHtml = static::isHTML($data);
 
         // Get charset
-        if (null === $charset) {
-            try {
-                $charset = \Safe\ini_get('default_charset');
-            } catch (SafeExceptionInterface) {
-                $charset = 'UTF-8';
-            }
-        }
+        $charset = $charset ?? static::getCharset();
 
         // Convert all entities to text chars if the text is not an HTML
         if (!$isHtml && !$forceHtml) {
@@ -103,13 +101,7 @@ class Html
         }
 
         // Get charset
-        if (null === $charset) {
-            try {
-                $charset = \Safe\ini_get('default_charset');
-            } catch (SafeExceptionInterface) {
-                $charset = 'UTF-8';
-            }
-        }
+        $charset = $charset ?? static::getCharset();
 
         // Check if the text is not an HTML
         if (!static::isHTML($html)) {
@@ -184,7 +176,7 @@ class Html
     /**
      * Convert a plain text into HTML.
      *
-     * @param string $text plain text
+     * @param string $text Plain text
      * @param null|string $charset Character set (default is application charset)
      * @return string HTML code
      */
@@ -201,13 +193,7 @@ class Html
         }
 
         // Get charset
-        if (null === $charset) {
-            try {
-                $charset = \Safe\ini_get('default_charset');
-            } catch (SafeExceptionInterface) {
-                $charset = 'UTF-8';
-            }
-        }
+        $charset = $charset ?? static::getCharset();
 
         // Normalize line endings
         $text = str_replace(["\r\n", "\r"], "\n", $text);
@@ -215,8 +201,8 @@ class Html
         // Split text into paragraphs
         try {
             $paragraphs = \Safe\preg_split('/\n\s*\n/', $text, -1, PREG_SPLIT_NO_EMPTY);
-        } catch (SafeExceptionInterface) {
-            return $text;
+        } catch (SafeExceptionInterface) { // @codeCoverageIgnore
+            return $text; // @codeCoverageIgnore
         }
 
         // Process each paragraph
@@ -238,8 +224,9 @@ class Html
 
     /**
      * Get HTML tags used in the text.
-     * @param string $text text
-     * @return string[] array of used HTML tags
+     *
+     * @param string $text Text
+     * @return string[] Array of used HTML tags
      */
     public static function textTags(string $text): array
     {
@@ -255,8 +242,8 @@ class Html
 
             // Get unique tag names (case-insensitive)
             return array_keys(array_flip(array_map('strtolower', $matches[1])));
-        } catch (SafeExceptionInterface) {
-            return [];
+        } catch (SafeExceptionInterface) { // @codeCoverageIgnore
+            return []; // @codeCoverageIgnore
         }
     }
 }

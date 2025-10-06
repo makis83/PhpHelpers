@@ -2,7 +2,12 @@
 
 namespace Makis83\Helpers;
 
+use RuntimeException;
+use FilesystemIterator;
+use UnexpectedValueException;
 use InvalidArgumentException;
+use RecursiveIteratorIterator;
+use RecursiveDirectoryIterator;
 use Safe\Exceptions\SafeExceptionInterface;
 
 /**
@@ -112,7 +117,7 @@ class File
         }
 
         // Check for Windows absolute path
-        if (('WINNT' === PHP_OS) && \Safe\preg_match('~^[A-Z]:[\\\\/]|^[\\\\/]{2}~i', $path)) {
+        if (('WINNT' === Server::getOs()) && \Safe\preg_match('~^[A-Z]:[\\\\/]|^[\\\\/]{2}~i', $path)) {
             return true;
         }
 
@@ -126,6 +131,7 @@ class File
      * @param non-empty-string $path Absolute path to the directory that should be created
      * @param int $mode Directory mode (permissions), default is 0775
      * @param ?string $owner Directory owner
+     * This will work only if the script is run with root privileges, since only root can change file ownership.
      * @param ?string $group Directory group
      * @return true True on success or if the directory already exists
      * @throws InvalidArgumentException|SafeExceptionInterface on errors
@@ -138,12 +144,12 @@ class File
     ): true {
         // Validate path
         if ('' === trim($path)) {
-            throw new InvalidArgumentException('Invalid path');
+            throw new InvalidArgumentException('Invalid path: ' . $path);
         }
 
         // Ensure path is absolute
         if (!static::isAbsolutePath($path, false)) {
-            throw new InvalidArgumentException('Path is not absolute');
+            throw new InvalidArgumentException('Path is not absolute: ' . $path);
         }
 
         // Normalize path and check if the given path already exists
@@ -211,23 +217,23 @@ class File
     {
         // Validate path
         if ('' === trim($path)) {
-            throw new InvalidArgumentException('Invalid path');
+            throw new InvalidArgumentException('Invalid path: ' . $path);
         }
 
         // Ensure path is absolute
         if (!static::isAbsolutePath($path, false)) {
-            throw new InvalidArgumentException('Path is not absolute');
+            throw new InvalidArgumentException('Path is not absolute: ' . $path);
         }
 
         // Check if the directory exists
         $normalizedPath = static::normalizePath($path);
         if (!is_dir($normalizedPath)) {
-            throw new InvalidArgumentException('Directory does not exist');
+            throw new InvalidArgumentException('Directory does not exist: ' . $normalizedPath);
         }
 
         // Check if the directory is writable
         if (!is_writable($normalizedPath)) {
-            throw new InvalidArgumentException('Directory cannot be removed: Not writable');
+            throw new InvalidArgumentException('Directory cannot be removed — Not writable: ' . $normalizedPath);
         }
 
         // Loop through files and directories inside the specified directory and remove them
@@ -256,6 +262,12 @@ class File
      */
     public static function sanitizeFilename(string $fileName, string $replacement = '_'): string
     {
+        // Fix possible problems with spaces
+        $fileName = Text::fixSpaces($fileName);
+        if ('' === $fileName) {
+            return $replacement;
+        }
+
         // Get file extension (if any)
         $fileExtension = self::fileExtension($fileName);
         $fileNameWOExtension = self::fileName($fileName, false);
@@ -266,14 +278,15 @@ class File
             // Sanitize the extension
             try {
                 $fileExtension = \Safe\preg_replace('/[^a-zA-Z0-9.]/', '', $fileExtension);
-            } catch(SafeExceptionInterface) {}
-
-            // If extension is longer than 10 chars, truncate it
-            if (strlen($fileExtension) >= 11) {
-                $fileExtension = substr($fileExtension, 0, 11);
+            } catch (SafeExceptionInterface) { // @codeCoverageIgnore
             }
 
-            $maxLength -= strlen($fileExtension) + 1;
+            // If extension is longer than 10 chars, truncate it
+            if (mb_strlen($fileExtension) > 10) {
+                $fileExtension = mb_substr($fileExtension, 0, 10);
+            }
+
+            $maxLength -= mb_strlen($fileExtension) + 1;
         }
 
         // Step 1: Remove any directory separators (for security)
@@ -285,12 +298,14 @@ class File
         // Linux disallows: /
         try {
             $fileNameWOExtension = \Safe\preg_replace('/[<>:"\/|?*]/', $replacement, $fileNameWOExtension);
-        } catch(SafeExceptionInterface) {}
+        } catch (SafeExceptionInterface) { // @codeCoverageIgnore
+        }
 
         // Step 3: Remove control characters and other invisible / potentially problematic characters
         try {
             $fileNameWOExtension = \Safe\preg_replace('/[\x00-\x1F\x7F]/', '', $fileNameWOExtension);
-        } catch(SafeExceptionInterface) {}
+        } catch (SafeExceptionInterface) { // @codeCoverageIgnore
+        }
 
         // Step 4: Remove leading/trailing dots and spaces (problematic in Windows)
         $fileNameWOExtension = trim($fileNameWOExtension, " .\t\n\r\0\x0B");
@@ -307,13 +322,33 @@ class File
 
         try {
             $fileNameWOExtension = \Safe\preg_replace($emojiPattern, '', $fileNameWOExtension);
-        } catch(SafeExceptionInterface) {}
+        } catch (SafeExceptionInterface) { // @codeCoverageIgnore
+        }
 
         // Step 6: Handle special cases (reserved names in Windows)
         $reservedNames = [
-            'CON', 'PRN', 'AUX', 'NUL',
-            'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9',
-            'LPT1', 'LPT2', 'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9'
+            'CON',
+            'PRN',
+            'AUX',
+            'NUL',
+            'COM1',
+            'COM2',
+            'COM3',
+            'COM4',
+            'COM5',
+            'COM6',
+            'COM7',
+            'COM8',
+            'COM9',
+            'LPT1',
+            'LPT2',
+            'LPT3',
+            'LPT4',
+            'LPT5',
+            'LPT6',
+            'LPT7',
+            'LPT8',
+            'LPT9'
         ];
 
         if (in_array(mb_strtoupper($fileNameWOExtension), $reservedNames, true)) {
@@ -336,5 +371,135 @@ class File
         }
 
         return $fileNameWOExtension;
+    }
+
+
+    /**
+     * Throw exception if the dir path is invalid.
+     *
+     * @param non-empty-string $dir Path to directory
+     * @return void
+     * @throws InvalidArgumentException if the directory doesn't exist
+     * @throws RuntimeException if the directory is not readable
+     */
+    private static function throwExceptionOnInvalidDir(string $dir): void
+    {
+        // Check if dir exists
+        if (!is_dir($dir)) {
+            throw new InvalidArgumentException('Path is not a directory: ' . $dir);
+        }
+
+        // Check if dir is not readable
+        if (!is_readable($dir)) {
+            throw new RuntimeException('Directory is not readable: ' . $dir);
+        }
+    }
+
+
+    /**
+     * Get directory size in bytes.
+     *
+     * @param non-empty-string $dir Path to directory
+     * @return non-negative-int Dir size in bytes
+     * @throws InvalidArgumentException if the directory doesn't exist
+     * @throws RuntimeException if the directory is not readable
+     * @throws UnexpectedValueException if the path cannot be found
+     * @see https://stackoverflow.com/a/21409562
+     */
+    public static function dirSize(string $dir): int
+    {
+        // Throw an exception if dir is invalid
+        self::throwExceptionOnInvalidDir($dir);
+
+        // Initial size in bytes
+        $size = 0;
+
+        // Loop through nested files
+        foreach (
+            new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS)
+            ) as $file
+        ) {
+            if ($file->isFile()) {
+                $size += $file->getSize();
+            }
+        }
+
+        // Result
+        return max($size, 0);
+    }
+
+
+    /**
+     * Get number of files in the specified directory.
+     *
+     * @param non-empty-string $dir Path to directory
+     * @param bool $recursive Whether to count files in subdirs too
+     * @return non-negative-int Number of files in the dir
+     * @throws InvalidArgumentException if the directory doesn't exist
+     * @throws RuntimeException if the directory is not readable
+     * @throws UnexpectedValueException if the path cannot be found
+     */
+    public static function countFiles(string $dir, bool $recursive = false): int
+    {
+        // Throw an exception if dir is invalid
+        self::throwExceptionOnInvalidDir($dir);
+
+        // Get iterator
+        if ($recursive) {
+            $iterator = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS)
+            );
+        } else {
+            $iterator = new FilesystemIterator($dir, FilesystemIterator::SKIP_DOTS);
+        }
+
+        // Count files
+        $count = 0;
+        foreach ($iterator as $fsItem) {
+            if ($fsItem->isFile()) {
+                $count++;
+            }
+        }
+
+        return max($count, 0);
+    }
+
+
+    /**
+     * Get number of subdirectories in the specified directory.
+     *
+     * @param non-empty-string $dir Path to directory
+     * @param bool $recursive Whether to count subdirs in subdirs too
+     * @return non-negative-int Number of subdirs in the dir
+     * @throws InvalidArgumentException if the directory doesn't exist
+     * @throws RuntimeException if the directory is not readable
+     * @throws UnexpectedValueException if the path cannot be found
+     */
+    public static function countSubDirs(string $dir, bool $recursive = false): int
+    {
+        // Throw an exception if dir is invalid
+        self::throwExceptionOnInvalidDir($dir);
+
+        // Get iterator
+        if ($recursive) {
+            $iterator = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS),
+                RecursiveIteratorIterator::SELF_FIRST
+            );
+        } else {
+            $iterator = new FilesystemIterator($dir, FilesystemIterator::SKIP_DOTS);
+        }
+
+        // Count dirs
+        $count = 0;
+        foreach ($iterator as $fsItem) {
+            if ($fsItem->isDir()) {
+                $count++;
+            }
+        }
+
+        // Result
+        return max($count, 0);
     }
 }

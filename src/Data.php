@@ -17,24 +17,24 @@ class Data
     /**
      * Check if the specified text is JSON.
      *
-     * @param string $text String to be checked
+     * @param null|bool|int|float|string $data Data to be checked
      * @return bool Whether the string is a JSON sequence
      */
-    public static function isJson(string $text): bool
+    public static function isJson(null|bool|int|float|string $data): bool
     {
-        // Check if data exists
-        if ('' === trim($text)) {
-            return false;
+        // Check if value is not string
+        if (!is_string($data)) {
+            return true;
         }
 
-        // Check if value is 'null'
-        if ('null' === $text) {
-            return true;
+        // Check if data is empty
+        if ('' === trim($data)) {
+            return false;
         }
 
         // Try to decode data
         try {
-            if (json_decode($text, true, 512, JSON_THROW_ON_ERROR)) {
+            if (json_decode($data, true, 512, JSON_THROW_ON_ERROR)) {
                 return true;
             }
 
@@ -47,40 +47,60 @@ class Data
 
 
     /**
+     * Fix double slashes in JSON string.
+     * For example, it converts ```\\\\u003C\\u003E``` to ```\\u003C\\u003E```
+     *
+     * @param string $jsonString JSON string
+     * @param string $pattern Pattern to search for
+     * @return string String with fixed slashes
+     * @see https://regex101.com/r/fL9rGR/1
+     */
+    public static function fixDoubleEncodedUnicodeTokens(
+        string $jsonString,
+        string $pattern = '/\\\\(\\\\u[0-9a-f]{4})/iuU'
+    ): string {
+        try {
+            return \Safe\preg_replace($pattern, '$1', $jsonString);
+        } catch (SafeExceptionInterface) {
+            return $jsonString;
+        }
+    }
+
+
+    /**
      * Encode array as JSON.
      *
-     * @param array<int|string, mixed> $data Data array to be encoded
+     * @param mixed $data Data to be encoded
      * @param int $options JSON options
+     * @param positive-int $depth Maximum depth
      * @return string JSON-encoded string
-     * @throws JsonException|SafeExceptionInterface
+     * @throws JsonException
      */
     public static function jsonEncode(
-        array $data,
-        int $options = JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP
+        mixed $data,
+        int $options = JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP,
+        int $depth = 512
     ): string {
         // Encode
-        try {
-            $encodedData = json_encode($data, $options | JSON_THROW_ON_ERROR);
-        } catch (JsonException $oException) {
-            throw new JsonException($oException->getMessage());
-        }
+        $encodedData = json_encode($data, $options | JSON_THROW_ON_ERROR, $depth);
 
-        // Remove double slashes
-        $sPattern = '/\\\\(\\\\u[0-9a-f]{4})/iuU';
-        return \Safe\preg_replace($sPattern, '$1', $encodedData);
+        // Fix Unicode tokens if needed
+        return static::fixDoubleEncodedUnicodeTokens($encodedData);
     }
 
 
     /**
      * Decode the JSON-sequence.
+     *
      * @param string $data Data to be decoded
      * @param bool $asArray Whether to return an associative array instead of an object
+     * @param positive-int $depth Maximum depth
      * @return mixed Result data
      * @throws JsonException
      */
-    public static function jsonDecode(string $data, bool $asArray = true): mixed
+    public static function jsonDecode(string $data, bool $asArray = true, int $depth = 512): mixed
     {
-        return json_decode($data, $asArray, 512, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE);
+        return json_decode($data, $asArray, $depth, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE);
     }
 
 
@@ -107,7 +127,7 @@ class Data
 
             // Split string by delimiter and trim each item
             $items = array_map('trim', explode($delimiter, Text::fixSpaces($value)));
-            return array_filter($items, static fn ($item) => '' !== $item);
+            return array_filter($items, static fn($item) => '' !== $item);
         }
 
         // result

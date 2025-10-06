@@ -265,6 +265,20 @@ $fixed = Text::fixSpaces("This \xE2\x80\xAF is \xE2\x80\xAF a \xE2\x80\xAF test.
 $fixed = Text::fixSpaces("This \xE2\x80\x8F is \xE2\x80\x8F\xe2\x80\x8a a \xE2\x80\x8F test.\xe2\x80\x83"); // Returns: "This is a test."
 ```
 
+## Tests
+Run the tests using PHPUnit and PHPStan:
+
+```bash
+./composer test
+```
+
+or
+
+```bash
+./vendor/bin/phpunit --coverage-html coverage/html
+./vendor/bin/phpstan analyse
+```
+
 ## License
 
 This project is licensed under the [MIT License](https://opensource.org/license/mit).

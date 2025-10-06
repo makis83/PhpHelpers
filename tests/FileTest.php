@@ -2,10 +2,18 @@
 
 namespace Makis83\Helpers\Tests;
 
+use RuntimeException;
 use Makis83\Helpers\File;
+use Makis83\Helpers\Text;
+use Random\RandomException;
+use Makis83\Helpers\Server;
 use InvalidArgumentException;
+use UnexpectedValueException;
 use PHPUnit\Framework\TestCase;
 use Safe\Exceptions\SafeExceptionInterface;
+use PHPUnit\Framework\Attributes\UsesMethod;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Tests for File helper.
@@ -14,25 +22,32 @@ use Safe\Exceptions\SafeExceptionInterface;
  * Date: 2025-09-14
  * Time: 15:39
  */
+#[CoversClass(File::class)]
+#[UsesMethod(Text::class, 'fixSpaces')]
+#[UsesMethod(Text::class, 'random')]
+#[UsesMethod(Server::class, 'getOs')]
 class FileTest extends TestCase
 {
     /**
-     * @var non-empty-string $testBaseDir Base directory for tests
+     * Get random directory path.
+     *
+     * @return non-empty-string Path to test dir
      */
-    private string $testBaseDir = 'temp';
-
-    /**
-     * @var string $testNestedDir Nested directory path for tests
-     */
-    private string $testNestedDir = 'nested' . DIRECTORY_SEPARATOR . 'dir';
-
-
-    /**
-     * @inheritDoc
-     */
-    final protected function setUp(): void
+    private function getRandomDirPath(): string
     {
-        // Try to create a writable test directory
+        return sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'phpunit_tests_' . uniqid('', true);
+    }
+
+
+    /**
+     * Create test dir.
+     *
+     * @param string $parentDir Parent dir
+     * @return void
+     */
+    private function createTestDir(string $parentDir): void
+    {
+        // Check if parent dir can be created
         $tempDir = sys_get_temp_dir();
         if (!is_dir($tempDir)) {
             $this->markTestSkipped('System temp directory does not exist');
@@ -42,172 +57,205 @@ class FileTest extends TestCase
             $this->markTestSkipped('System temp directory is not writable');
         }
 
-        // Create our own test directory
-        $this->testBaseDir = $tempDir . '/phpunit_tests_' . uniqid('', true);
+        if (is_dir($parentDir)) {
+            $this->markTestSkipped('Test directory already exists');
+        }
 
+        // Creating test environment
         try {
-            \Safe\mkdir($this->testBaseDir, 0755, true);
-            if (!is_dir($this->testBaseDir)) {
-                $this->markTestSkipped('Could not create test directory');
+            // Create main dir
+            \Safe\mkdir($parentDir, 0755, true);
+
+            // Create nested dirs
+            $dirs = [
+                'dir1',
+                'dir2' . DIRECTORY_SEPARATOR . 'sub-dir-1',
+                'dir2' . DIRECTORY_SEPARATOR . 'sub-dir-2' . DIRECTORY_SEPARATOR . 'sub-sub-dir-1',
+                'dir3' . DIRECTORY_SEPARATOR . 'sub-dir-1'
+            ];
+
+            foreach ($dirs as $dir) {
+                \Safe\mkdir($parentDir . DIRECTORY_SEPARATOR . $dir, 0755, true);
             }
-        } catch (SafeExceptionInterface $exception) {
+
+            // Create 10 files each 10 bytes size
+            for ($i = 0; $i < 10; $i++) {
+                \Safe\file_put_contents(
+                    $parentDir . DIRECTORY_SEPARATOR . $dirs[array_rand($dirs)] . DIRECTORY_SEPARATOR .
+                    Text::random(6, 'alpha', 'lower') . '.txt',
+                    Text::random()
+                );
+            }
+        } catch (SafeExceptionInterface|RandomException $exception) {
             $this->markTestSkipped('Could not create test directory: ' . $exception->getMessage());
         }
     }
 
 
     /**
-     * @inheritDoc
+     * Data provider for 'testFileExtension' method.
+     *
+     * @return array<string, array{0: non-empty-string, 1: string}>
      */
-    final protected function tearDown(): void
+    public static function fileExtensionDataProvider(): array
     {
-        if (isset($this->testBaseDir) && is_dir($this->testBaseDir)) {
-            try {
-                File::removeDirectory($this->testBaseDir);
-            } catch (InvalidArgumentException|SafeExceptionInterface $exception) {
-                $this->markTestIncomplete('Could not remove test directory: ' . $exception->getMessage());
-            }
-        }
+        return [
+            'no extension' => ['binfile', ''],
+            'hidden file' => ['.htaccess', ''],
+            'simple extension' => ['document.txt', 'txt'],
+            'complex extension' => ['archive.tar.gz', 'tar.gz'],
+            'url with double extension' => ['ftp://server.tech/archive.tar.bz2', 'tar.bz2'],
+            'windows path with double extension' => ['C:\\path\\to\\file.tar.gz', 'tar.gz']
+        ];
     }
 
 
     /**
-     * Test fileExtension method with various paths.
+     * Test 'fileExtension' method.
+     *
+     * @param non-empty-string $path Path to a file
+     * @param string $expected Expected result
      * @return void
      */
-    final public function testFileExtension(): void
+    #[DataProvider('fileExtensionDataProvider')]
+    final public function testFileExtension(string $path, string $expected): void
     {
-        $this->assertEquals('', File::fileExtension('binfile'));
-        $this->assertEquals('', File::fileExtension('.htaccess'));
-        $this->assertEquals('txt', File::fileExtension('document.txt'));
-        $this->assertEquals('tar.gz', File::fileExtension('archive.tar.gz'));
-        $this->assertEquals('tar.bz2', File::fileExtension('ftp://server.tech/archive.tar.bz2'));
-        $this->assertEquals('tar.gz', File::fileExtension('C:\\path\\to\\file.tar.gz'));
+        $this->assertEquals($expected, File::fileExtension($path));
     }
 
 
     /**
-     * Test fileName method with various paths.
+     * Data provider for 'testFileName' method.
+     *
+     * @return array<string, array{0: non-empty-string, 1: bool, 2: string}>
+     */
+    public static function fileNameDataProvider(): array
+    {
+        return [
+            'no extension' => ['binfile', true, 'binfile'],
+            'no extension, with exclude extension option' => ['binfile', false, 'binfile'],
+            'hidden file' => ['.htaccess', true, '.htaccess'],
+            'simple file' => ['document.txt', true, 'document.txt'],
+            'simple file with exclude extension option' => ['document.txt', false, 'document'],
+            'complex extension' => ['archive.tar.gz', true, 'archive.tar.gz'],
+            'complex extension with exclude extension option' => ['archive.tar.gz', false, 'archive'],
+            'url with double extension' => ['ftp://server.tech/archive.tar.bz2', true, 'archive.tar.bz2'],
+            'url with double extension with exclude extension option' => [
+                'ftp://server.tech/archive.tar.bz2',
+                false,
+                'archive'
+            ],
+            'windows path with backslashes and double extension' => [
+                "C:\\path\\to\\file.tar.gz",
+                true,
+                'file.tar.gz'
+            ],
+            'windows path with backslashes and double extension with exclude extension option' => [
+                "C:\\path\\to\\file.tar.gz",
+                false,
+                'file'
+            ],
+            'windows path with slashes and double extension' => [
+                "C:/path/to/file.tar.gz",
+                true,
+                'file.tar.gz'
+            ],
+            'windows path with slashes and double extension with exclude extension option' => [
+                "C:/path/to/file.tar.gz",
+                false,
+                'file'
+            ]
+        ];
+    }
+
+
+    /**
+     * Test 'fileName' method with various paths.
+     *
+     * @param non-empty-string $path Path to a file
+     * @param bool $withExtension Whether to include the file extension
+     * @param string $expected Expected result
      * @return void
      */
-    final public function testFileName(): void
+    #[DataProvider('fileNameDataProvider')]
+    final public function testFileName(string $path, bool $withExtension, string $expected): void
     {
-        $this->assertEquals('binfile', File::fileName('binfile'));
-        $this->assertEquals('binfile', File::fileName('binfile', false));
-
-        $this->assertEquals('.htaccess', File::fileName('.htaccess'));
-        $this->assertEquals('.htaccess', File::fileName('.htaccess', false));
-
-        $this->assertEquals('document.txt', File::fileName('document.txt'));
-        $this->assertEquals('document', File::fileName('document.txt', false));
-
-        $this->assertEquals('archive.tar.gz', File::fileName('archive.tar.gz'));
-        $this->assertEquals('archive', File::fileName('archive.tar.gz', false));
-
-        $this->assertEquals('archive.tar.bz2', File::fileName('ftp://server.tech/archive.tar.bz2'));
-        $this->assertEquals('archive', File::fileName(
-            'ftp://server.tech/archive.tar.bz2',
-            false
-        ));
-
-        $this->assertEquals('file.tar.gz', File::fileName("C:\\path\\to\\file.tar.gz"));
-        $this->assertEquals('file', File::fileName("C:\\path\\to\\file.tar.gz", false));
-
-        $this->assertEquals('file.tar.gz', File::fileName("C:/path/to/file.tar.gz"));
-        $this->assertEquals('file', File::fileName("C:/path/to/file.tar.gz", false));
+        $this->assertEquals($expected, File::fileName($path, $withExtension));
     }
 
 
     /**
-     * Test pathIsAbsolute method with various paths.
+     * Data provider for 'testIsAbsolutePath' method.
+     *
+     * @return array<string, array{0: non-empty-string, 1: bool, 2: bool}>
+     */
+    public static function isAbsolutePathDataProvider(): array
+    {
+        return [
+            'empty path' => ['   ', true, false],
+            'absolute unix path' => ['/var/www/html', true, true],
+            'absolute windows path with backslashes (scheme enabled)' => ['C:\\Program Files\\App', true, true],
+            'absolute windows path with slashes (scheme enabled)' => ['C:/Program Files/App', true, true],
+            'relative path with slashes' => ['relative/path/to/file', true, false],
+            'relative path with backslashes' => ['relative\\path\\to\\file', false, false],
+            'relative windows path' => ['another\\relative\\path', true, false],
+            'path with scheme (http)' => ['http://example.com/file', true, true],
+            'path with scheme (https)' => ['https://example.com/file', true, true],
+            'path with scheme (ftp)' => ['ftp://example.com/file', true, true],
+            'path with scheme (http) not allowed' => ['http://example.com/file', false, false],
+            'path with scheme (https) not allowed' => ['https://example.com/file', false, false],
+            'path with scheme (ftp) not allowed' => ['ftp://example.com/file', false, false]
+        ];
+    }
+
+
+    /**
+     * Test 'pathIsAbsolute' method with various paths.
+     *
+     * @param non-empty-string $path Path
+     * @param bool $allowSchemes Whether to consider paths with schemes (like http://) as absolute
+     * @param bool $expected Expected result
      * @return void
      * @throws SafeExceptionInterface
      */
-    final public function testIsAbsolutePath(): void
+    #[DataProvider('isAbsolutePathDataProvider')]
+    final public function testIsAbsolutePath(string $path, bool $allowSchemes, bool $expected): void
     {
-        $this->assertTrue(File::isAbsolutePath('/var/www/html'));
-        $this->assertTrue(File::isAbsolutePath('C:\\Program Files\\App'));
-        $this->assertTrue(File::isAbsolutePath('C:/Program Files/App'));
-        $this->assertFalse(File::isAbsolutePath('relative/path/to/file'));
-        $this->assertFalse(File::isAbsolutePath('another\\relative\\path'));
+        $this->assertEquals($expected, File::isAbsolutePath($path, $allowSchemes));
     }
 
 
     /**
-     * Create the test directory.
-     * @param non-empty-string $dir Directory path
-     * @param int $mode Directory permissions
-     * @return void
-     */
-    private function createTestDir(string $dir, int $mode = 0775): void
-    {
-        try {
-            File::ensureDirectory($dir, $mode);
-        } catch (InvalidArgumentException|SafeExceptionInterface $exception) {
-            $this->markTestIncomplete('Could not create test directory: ' . $exception->getMessage());
-        }
-    }
-
-
-    /**
-     * Remove the test directory.
-     * @param non-empty-string $dir Directory path
-     * @param bool $recursively Whether to remove directories recursively
-     * @return void
-     */
-    private function removeTestDir(string $dir, bool $recursively = false): void
-    {
-        try {
-            if ($recursively) {
-                File::removeDirectory($dir);
-            } else {
-                \Safe\rmdir($dir);
-            }
-        } catch (InvalidArgumentException|SafeExceptionInterface $exception) {
-            $this->markTestIncomplete('Could not remove test directory: ' . $exception->getMessage());
-        }
-    }
-
-
-    /**
-     * Test ensureDirectory method by creating temporary directories.
+     * Test 'ensureDirectory' method by creating temporary directories.
+     *
      * @return void
      * @throws InvalidArgumentException|SafeExceptionInterface on failure
      */
     final public function testEnsureDirectory(): void
     {
-        // Define temporary directory path
-        $nestedDir = $this->testBaseDir . DIRECTORY_SEPARATOR . $this->testNestedDir;
+        // Create a test dir
+        $testDir = $this->getRandomDirPath();
+        $this->createTestDir($testDir);
 
-        // Ensure the directory does not exist
-        if (is_dir($nestedDir)) {
-            $this->removeTestDir($nestedDir, true);
-        }
-
-        // Test creating nested directories with default permissions and owner/group
-        $this->createTestDir($nestedDir);
+        // Test creating a new directory with default permissions and owner/group
+        $nestedDir = $testDir . DIRECTORY_SEPARATOR . 'test';
+        File::ensureDirectory($nestedDir);
         $this->assertDirectoryExists($nestedDir);
 
-        // Test ensuring an already existing directory
-        $this->createTestDir($nestedDir);
-        $this->removeTestDir($nestedDir);
+        // Test ensuring the created directory exists
+        File::ensureDirectory($nestedDir);
+        $this->assertDirectoryExists($nestedDir);
+        \Safe\rmdir($nestedDir);
 
         // Test creating directory with specific permissions
-        $this->createTestDir($nestedDir, 0750);
+        File::ensureDirectory($nestedDir, 0750);
         $this->assertDirectoryExists($nestedDir);
-
-        try {
-            $filePerms = substr(sprintf('%o', \Safe\fileperms($nestedDir)), -3);
-        } catch (SafeExceptionInterface) {
-            $this->markTestIncomplete('Could not get directory permissions');
-        }
-
+        $filePerms = substr(sprintf('%o', \Safe\fileperms($nestedDir)), -3);
         $this->assertEquals('750', $filePerms);
-        $this->removeTestDir($nestedDir);
+        \Safe\rmdir($nestedDir);
 
-        // Test creating non-absolute directory path
-        $this->expectException(InvalidArgumentException::class);
-        File::ensureDirectory('nested/dir');
+        // Remove test directory
+        File::removeDirectory($testDir);
 
         // Test creating invalid directory path
         // $this->expectException(Throwable::class);
@@ -216,58 +264,311 @@ class FileTest extends TestCase
 
 
     /**
-     * Test removeDirectory method with various cases.
+     * Test 'ensureDirectory' method by passing an empty dir path as a parameter.
+     *
+     * @return void
+     * @throws InvalidArgumentException|SafeExceptionInterface on failure
+     */
+    final public function testEnsureDirectoryThrowsExceptionOnEmptyDir(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        File::ensureDirectory('   ');
+    }
+
+
+    /**
+     * Test 'ensureDirectory' method by passing a relative dir as a parameter.
+     *
+     * @return void
+     * @throws InvalidArgumentException|SafeExceptionInterface on failure
+     */
+    final public function testEnsureDirectoryThrowsExceptionOnRelativeDir(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        File::ensureDirectory('relative/path');
+    }
+
+
+    /**
+     * Test 'ensureDirectory' method by passing a wrong dir mode.
+     *
+     * @return void
+     * @throws InvalidArgumentException|SafeExceptionInterface on failure
+     */
+    final public function testEnsureDirectoryThrowsExceptionOnWrongMode(): void
+    {
+        // Create a test dir
+        $testDir = $this->getRandomDirPath();
+        $this->createTestDir($testDir);
+
+        // Test
+        $this->expectException(InvalidArgumentException::class);
+        File::ensureDirectory($testDir . DIRECTORY_SEPARATOR . 'test', 9999);
+
+        // Remove test directory
+        File::removeDirectory($testDir);
+    }
+
+
+    /**
+     * Test 'ensureDirectory' method by passing a wrong group owner.
+     *
+     * @return void
+     * @throws InvalidArgumentException|SafeExceptionInterface|RandomException on failure
+     */
+    final public function testEnsureDirectoryThrowsExceptionOnWrongGroupOwner(): void
+    {
+        // Create a test dir
+        $testDir = $this->getRandomDirPath();
+        $this->createTestDir($testDir);
+
+        // Test
+        $this->expectException(SafeExceptionInterface::class);
+        File::ensureDirectory($testDir . DIRECTORY_SEPARATOR . 'test', group: Text::random());
+
+        // Remove test directory
+        File::removeDirectory($testDir);
+    }
+
+
+    /**
+     * Test 'removeDirectory' method with various cases.
+     *
      * @return void
      * @throws InvalidArgumentException|SafeExceptionInterface on failure
      */
     final public function testRemoveDirectory(): void
     {
-        // Create a test nested dir if not exists
-        $nestedDir = $this->testBaseDir . DIRECTORY_SEPARATOR . $this->testNestedDir;
-        if (!is_dir($nestedDir)) {
-            $this->createTestDir($nestedDir);
-        }
+        // Create a test dir
+        $testDir = $this->getRandomDirPath();
+        $this->createTestDir($testDir);
+
+        // Remove empty directory
+        $emptyDir = $testDir . DIRECTORY_SEPARATOR . 'dir1';
+        File::removeDirectory($emptyDir);
+        $this->assertDirectoryDoesNotExist($emptyDir);
+
+        // Remove non-empty dir
+        $nonEmptyDir = $testDir . DIRECTORY_SEPARATOR . 'dir2';
+        File::removeDirectory($nonEmptyDir);
+        $this->assertDirectoryDoesNotExist($nonEmptyDir);
+
+        // Remove test directory
+        File::removeDirectory($testDir);
+        $this->assertDirectoryDoesNotExist($testDir);
+    }
+
+
+    /**
+     * Test 'removeDirectory' method by passing a non-existing dir as a parameter.
+     *
+     * @return void
+     * @throws InvalidArgumentException|SafeExceptionInterface on failure
+     */
+    final public function testRemoveDirectoryThrowsExceptionOnNonExistingDir(): void
+    {
+        // Create a test dir
+        $testDir = $this->getRandomDirPath();
+        $this->createTestDir($testDir);
 
         // Remove non-existing directory
         $this->expectException(InvalidArgumentException::class);
-        File::removeDirectory($nestedDir . '_non_existing');
+        File::removeDirectory($testDir . DIRECTORY_SEPARATOR . 'non_existing_dir');
 
-        // Remove empty directory
-        File::removeDirectory($nestedDir);
-        $this->assertDirectoryDoesNotExist($nestedDir);
+        // Remove test directory
+        File::removeDirectory($testDir);
+    }
 
-        // Create a test nested dir with files and subdirectories
-        try {
-            $this->createTestDir($nestedDir);
-            \Safe\file_put_contents($nestedDir . DIRECTORY_SEPARATOR . 'file1.txt', 'Test file 1');
-            $this->createTestDir($nestedDir . DIRECTORY_SEPARATOR . 'subdir1');
-            \Safe\file_put_contents(
-                $nestedDir . DIRECTORY_SEPARATOR . 'subdir1' . DIRECTORY_SEPARATOR . 'file2.txt',
-                'Test file 2'
-            );
-        } catch(SafeExceptionInterface $exception) {
-            $this->markTestIncomplete('Could not create test directory: ' . $exception->getMessage());
-        }
 
-        // Remove non-empty directory recursively
-        File::removeDirectory($nestedDir);
-        $this->assertDirectoryDoesNotExist($nestedDir);
+    /**
+     * Test 'removeDirectory' method by passing an empty dir as a parameter.
+     *
+     * @return void
+     * @throws InvalidArgumentException|SafeExceptionInterface on failure
+     */
+    final public function testRemoveDirectoryThrowsExceptionOnEmptyDir(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        File::removeDirectory('   ');
+    }
+
+
+    /**
+     * Test 'removeDirectory' method by passing a relative dir as a parameter.
+     *
+     * @return void
+     * @throws InvalidArgumentException|SafeExceptionInterface on failure
+     */
+    final public function testRemoveDirectoryThrowsExceptionOnRelativeDir(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        File::removeDirectory('relative/path');
+    }
+
+
+    /**
+     * Data provider for 'testSanitizeFilename' method.
+     *
+     * @return array<string, array{0: non-empty-string, 1: non-empty-string, 2: string}>
+     */
+    public static function sanitizeFilenameDataProvider(): array
+    {
+        // Generate very long file name
+        $veryLongFileName = str_repeat('a', 300) . '.txt';
+        $veryLongSanitizedFileName = str_repeat('a', 255 - 4) . '.txt'; // 255 minus length of '.txt'
+
+        // Config array
+        return [
+            'empty filename' => ['   ', '_', '_'],
+            'valid filename' => ['valid_filename.txt', '_', 'valid_filename.txt'],
+            'filename with spaces and special characters' => [
+                ' !! 🤬 invalid ¹²% _файлнаме??.txt ',
+                '_',
+                '!!  invalid ¹²% _файлнаме__.txt'
+            ],
+            'filename with reserved name (Windows)' => ['aux', '_', 'aux_'],
+            'filename with only invalid characters' => ['???', '_', '___'],
+            'filename with mixed valid and invalid characters' => [
+                'my*inva|lid:fi<le>name?.txt',
+                '-',
+                'my-inva-lid-fi-le-name-.txt'
+            ],
+            'filename with leading and trailing spaces' => [
+                '   leading_and_trailing_spaces   .txt',
+                '_',
+                'leading_and_trailing_spaces.txt'
+            ],
+            'filename with multiple consecutive invalid characters' => [
+                'file///name\\\\with::invalid**chars.txt',
+                '-',
+                // 'file///name\\\\' part will be removed since only the filename part is kept
+                'with--invalid--chars.txt'
+            ],
+            'filename with long extension' => [
+                'archive.longestextension',
+                '_',
+                'archive.longestext'
+            ],
+            'very long filename' => [
+                $veryLongFileName,
+                '_',
+                $veryLongSanitizedFileName
+            ],
+            'invalid filename with empty replacement' => [
+                '???.txt',
+                ' ',
+                ' .txt'
+            ]
+        ];
     }
 
 
     /**
      * Test sanitizeFilename method with various filenames.
+     *
+     * @param non-empty-string $fileName Filename to sanitize
+     * @param non-empty-string $replacement Character to use as replacement for invalid characters
+     * @param string $expected Expected result
      * @return void
      */
-    final public function testSanitizeFilename(): void
+    #[DataProvider('sanitizeFilenameDataProvider')]
+    final public function testSanitizeFilename(string $fileName, string $replacement, string $expected): void
     {
-        $this->assertEquals('valid_filename.txt', File::sanitizeFilename('valid_filename.txt'));
-        $this->assertEquals(
-            '!!  invalid ¹²% _файлнаме__.txt',
-            File::sanitizeFilename(' !! 🤬 invalid ¹²% _файлнаме??.txt ')
-        );
+        $this->assertEquals($expected, File::sanitizeFilename($fileName, $replacement));
+    }
 
-        $this->assertEquals('aux_', File::sanitizeFilename('aux'));
-        $this->assertEquals('__', File::sanitizeFilename('??'));
+
+    /**
+     * Test 'dirSize' method.
+     *
+     * @return void
+     * @throws InvalidArgumentException|SafeExceptionInterface|UnexpectedValueException on failure
+     */
+    final public function testDirSize(): void
+    {
+        // Create a test dir
+        $testDir = $this->getRandomDirPath();
+        $this->createTestDir($testDir);
+
+        // Test dir size (10 files 10 bytes each = 100 bytes)
+        $this->assertEquals(100, File::dirSize($testDir));
+        File::removeDirectory($testDir);
+    }
+
+
+    /**
+     * Test 'dirSize' method by passing a non-existing dir as a parameter.
+     *
+     * @return void
+     * @throws InvalidArgumentException|RuntimeException|UnexpectedValueException on failure
+     */
+    final public function testDirSizeThrowsExceptionOnNonExistingDir(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        File::dirSize('test123');
+    }
+
+
+    /**
+     * Test 'countFiles' method.
+     *
+     * @return void
+     * @throws InvalidArgumentException|RuntimeException|UnexpectedValueException|SafeExceptionInterface on failure
+     */
+    final public function testCountFiles(): void
+    {
+        // Create a test dir
+        $testDir = $this->getRandomDirPath();
+        $this->createTestDir($testDir);
+
+        // Test count files (0 files in the root dir and 10 files total)
+        $this->assertEquals(0, File::countFiles($testDir));
+        $this->assertEquals(10, File::countFiles($testDir, true));
+        File::removeDirectory($testDir);
+    }
+
+
+    /**
+     * Test 'countFiles' method by passing a non-existing dir as a parameter.
+     *
+     * @return void
+     * @throws InvalidArgumentException|RuntimeException|UnexpectedValueException on failure
+     */
+    final public function testCountFilesThrowsExceptionOnNonExistingDir(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        File::countFiles('test123');
+    }
+
+
+    /**
+     * Test 'countSubDirs' method.
+     *
+     * @return void
+     * @throws InvalidArgumentException|RuntimeException|SafeExceptionInterface|UnexpectedValueException on failure
+     */
+    final public function testCountSubDirs(): void
+    {
+        // Create a test dir
+        $testDir = $this->getRandomDirPath();
+        $this->createTestDir($testDir);
+
+        // Test count sub-dirs (3 sub-dirs in the root dir and 7 sub-dirs total)
+        $this->assertEquals(3, File::countSubDirs($testDir));
+        $this->assertEquals(7, File::countSubDirs($testDir, true));
+        File::removeDirectory($testDir);
+    }
+
+
+    /**
+     * Test 'countSubDirs' method by passing a non-existing dir as a parameter.
+     *
+     * @return void
+     * @throws InvalidArgumentException|RuntimeException|UnexpectedValueException on failure
+     */
+    final public function testCountSubDirsThrowsExceptionOnNonExistingDir(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        File::countSubDirs('test123');
     }
 }
