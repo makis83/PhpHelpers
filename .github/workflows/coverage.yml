@@ -1,0 +1,36 @@
+name: Coverage
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4 # Checkout the repository code
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2' # Specify your desired PHP version
+          extensions: mbstring, tidy, posix, intl, iconv, pcov # Add any required PHP extensions
+          ini-values: post_max_size=256M, upload_max_filesize=256M
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --no-progress
+
+      - name: Run tests (clover)
+        run: ./vendor/bin/phpunit --coverage-clover coverage/clover.xml
+
+      - name: Make coverage badge
+        uses: timkrase/phpunit-coverage-badge@v1.2.1
+        with:
+          report: coverage/clover.xml
+          report_type: clover
+          coverage_badge_path: coverage/coverage.svg
+          push_badge: false
