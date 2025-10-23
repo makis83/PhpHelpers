@@ -2,7 +2,7 @@
     "name": "makis83/helpers",
     "description": "A collection of PHP helper classes for files, texts, images etc.",
     "type": "library",
-    "version": "1.0.4",
+    "version": "1.0.5",
     "license": "MIT",
     "require": {
         "php": "^8.2",
