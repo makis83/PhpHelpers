@@ -1,5 +1,6 @@
 [![CI](https://github.com/makis83/PhpHelpers/actions/workflows/ci.yml/badge.svg)](https://github.com/makis83/PhpHelpers/actions/workflows/ci.yml)
 [![PHPStan](https://github.com/makis83/PhpHelpers/actions/workflows/phpstan.yml/badge.svg)](https://github.com/makis83/PhpHelpers/actions/workflows/phpstan.yml)
+[![Coverage](https://github.com/makis83/PhpHelpers/actions/workflows/coverage.yml/badge.svg)](https://github.com/makis83/PhpHelpers/actions/workflows/coverage.yml)
 
 Makis83 PHP Helpers
 ===================
