@@ -2,7 +2,7 @@
     "name": "makis83/helpers",
     "description": "A collection of PHP helper classes for files, texts, images etc.",
     "type": "library",
-    "version": "1.0.6",
+    "version": "1.0.7",
     "license": "MIT",
     "require": {
         "php": "^8.2",
@@ -13,7 +13,9 @@
         "ext-iconv": "*",
         "thecodingmachine/safe": "^3.3",
         "ezyang/htmlpurifier": "^4.18",
-        "jeremykendall/php-domain-parser": "^6.0"
+        "jeremykendall/php-domain-parser": "^6.0",
+        "mjaschen/phpgeo": "dev-main",
+        "alexpechkarev/geometry-library": "^1.0@dev"
     },
     "autoload": {
         "psr-4": {
