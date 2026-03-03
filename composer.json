@@ -14,8 +14,8 @@
         "thecodingmachine/safe": "^3.3",
         "ezyang/htmlpurifier": "^4.18",
         "jeremykendall/php-domain-parser": "^6.0",
-        "mjaschen/phpgeo": "dev-main",
-        "alexpechkarev/geometry-library": "^1.0@dev"
+        "mjaschen/phpgeo": "^6.0",
+        "alexpechkarev/geometry-library": "^1.0"
     },
     "autoload": {
         "psr-4": {
